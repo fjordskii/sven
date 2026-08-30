@@ -3,6 +3,7 @@
 import { useState, type DragEvent } from "react";
 import { updateItemAction } from "@/app/actions/journal";
 import { KanbanCard } from "@/components/KanbanCard";
+import { TermFrame, statusTone } from "@/components/term";
 import {
   STATUS_LABEL,
   groupByStatus,
@@ -28,9 +29,9 @@ export function KanbanBoard({ items }: { items: WorkItem[] }) {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid gap-3 lg:grid-cols-3">
       {columns.map((status) => (
-        <section
+        <div
           key={status}
           aria-labelledby={`col-${status}`}
           onDragOver={(event) => {
@@ -41,27 +42,33 @@ export function KanbanBoard({ items }: { items: WorkItem[] }) {
             if (over === status) setOver(null);
           }}
           onDrop={(event) => dropOn(status, event)}
-          className={`min-h-48 border border-line bg-bg-raised p-3 ${
-            over === status ? "border-accent" : ""
-          }`}
         >
-          <h2
-            id={`col-${status}`}
-            className="font-mono text-xs tracking-[0.18em] text-accent uppercase"
+          <TermFrame
+            tone={statusTone[status]}
+            title={
+              <>
+                {STATUS_LABEL[status].toLowerCase()}
+                <span className="ml-2 text-ink-dim">
+                  {grouped[status].length}
+                </span>
+              </>
+            }
+            className={over === status ? "outline outline-1 outline-accent" : ""}
           >
-            {STATUS_LABEL[status]}
-            <span className="ml-2 text-ink-dim">{grouped[status].length}</span>
-          </h2>
-          <div className="mt-3 space-y-3">
-            {grouped[status].length === 0 ? (
-              <p className="text-sm text-ink-dim">Empty.</p>
-            ) : (
-              grouped[status].map((item) => (
-                <KanbanCard key={item.id} item={item} />
-              ))
-            )}
-          </div>
-        </section>
+            <h2 id={`col-${status}`} className="sr-only">
+              {STATUS_LABEL[status]}
+            </h2>
+            <div className="min-h-40 space-y-3">
+              {grouped[status].length === 0 ? (
+                <p className="text-sm text-ink-dim">empty</p>
+              ) : (
+                grouped[status].map((item) => (
+                  <KanbanCard key={item.id} item={item} />
+                ))
+              )}
+            </div>
+          </TermFrame>
+        </div>
       ))}
     </div>
   );

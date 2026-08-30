@@ -1,61 +1,49 @@
 import { createItemAction } from "@/app/actions/journal";
+import { TermButton, TermFrame } from "@/components/term";
 
 export function NewItemForm() {
   return (
-    <form
-      action={createItemAction}
-      className="border border-line bg-bg-raised p-4 sm:p-5"
-    >
-      <p className="font-mono text-xs tracking-[0.18em] text-accent uppercase">
-        Log something
-      </p>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm text-ink-dim sm:col-span-2">
-          Title
-          <input
-            name="title"
-            required
-            maxLength={240}
-            placeholder="What is in motion, or what Ford should do"
-            className="mt-1 w-full border border-line bg-bg px-3 py-2 text-ink"
-          />
-        </label>
-        <label className="block text-sm text-ink-dim sm:col-span-2">
-          Notes
-          <textarea
-            name="notes"
-            rows={3}
-            placeholder="Enough context to act without the chat"
-            className="mt-1 w-full border border-line bg-bg px-3 py-2 text-ink"
-          />
-        </label>
-        <label className="block text-sm text-ink-dim">
-          Status
-          <select
-            name="status"
-            defaultValue="next"
-            className="mt-1 w-full border border-line bg-bg px-3 py-2 text-ink"
-          >
-            <option value="next">Left to do</option>
-            <option value="in_flight">In progress</option>
-            <option value="done">Done</option>
-          </select>
-        </label>
-        <label className="block text-sm text-ink-dim">
-          Due date
-          <input
-            type="date"
-            name="forDate"
-            className="mt-1 w-full border border-line bg-bg px-3 py-2 text-ink"
-          />
-        </label>
-      </div>
-      <button
-        type="submit"
-        className="mt-4 border border-line bg-bg px-4 py-2 text-sm text-ink hover:border-accent hover:text-accent"
-      >
-        Add to journal
-      </button>
-    </form>
+    <TermFrame title="log something" tone="accent">
+      <form action={createItemAction}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-[13px] text-ink-dim sm:col-span-2">
+            title
+            <input
+              name="title"
+              required
+              maxLength={240}
+              placeholder="what is in motion, or what Ford should do"
+              className="field mt-1"
+            />
+          </label>
+          <label className="block text-[13px] text-ink-dim sm:col-span-2">
+            notes
+            <textarea
+              name="notes"
+              rows={3}
+              placeholder="enough context to act without the chat"
+              className="field mt-1"
+            />
+          </label>
+          <label className="block text-[13px] text-ink-dim">
+            status
+            <select name="status" defaultValue="next" className="field mt-1">
+              <option value="next">Left to do</option>
+              <option value="in_flight">In progress</option>
+              <option value="done">Done</option>
+            </select>
+          </label>
+          <label className="block text-[13px] text-ink-dim">
+            due date
+            <input type="date" name="forDate" className="field mt-1" />
+          </label>
+        </div>
+        <div className="mt-3">
+          <TermButton type="submit" tone="ok">
+            add to journal
+          </TermButton>
+        </div>
+      </form>
+    </TermFrame>
   );
 }

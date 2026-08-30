@@ -29,18 +29,16 @@ export default async function WorkEntryPage({ params }: Props) {
   if (!entry) notFound();
 
   return (
-    <article className="mx-auto max-w-3xl px-5 py-12 sm:px-8 sm:py-16">
-      <p className="font-mono text-xs tracking-wide text-ink-dim">
-        <Link href="/work" className="hover:text-ink">
-          Work
+    <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <p className="text-[13px] leading-6 text-ink-dim">
+        <Link href="/work" className="text-accent hover:text-ink">
+          ~/work
         </Link>
         <span aria-hidden="true"> / </span>
         <time dateTime={entry.date}>{formatDate(entry.date)}</time>
       </p>
-      <h1 className="mt-3 font-serif text-4xl tracking-tight text-ink sm:text-5xl">
-        {entry.title}
-      </h1>
-      <div className="mt-8 max-w-xl space-y-5 text-base leading-relaxed text-ink-dim">
+      <h1 className="mt-1 text-xl text-ink sm:text-2xl">{entry.title}</h1>
+      <div className="mt-6 max-w-xl space-y-4 text-sm leading-6 text-ink-dim">
         {entry.body.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}

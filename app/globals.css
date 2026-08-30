@@ -1,12 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #12100e;
-  --bg-raised: #1a1714;
-  --ink: #efe8dc;
-  --ink-dim: #b7ad9e;
-  --line: #3a342c;
-  --accent: #c9844a;
+  --bg: #0d1117;
+  --bg-raised: #161b22;
+  --ink: #e6edf3;
+  --ink-dim: #8b949e;
+  --line: #30363d;
+  --accent: #58a6ff;
+  --ok: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
+  --purple: #a371f7;
 }
 
 @theme inline {
@@ -16,36 +20,71 @@
   --color-ink-dim: var(--ink-dim);
   --color-line: var(--line);
   --color-accent: var(--accent);
-  --font-serif: var(--font-newsreader);
-  --font-sans: var(--font-plex-sans);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-purple: var(--purple);
   --font-mono: var(--font-plex-mono);
+  --font-sans: var(--font-plex-mono);
 }
 
 html {
   background: var(--bg);
   color: var(--ink);
+  color-scheme: dark;
 }
 
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 a {
-  color: inherit;
+  color: var(--accent);
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
 }
 
+a:hover {
+  color: #79c0ff;
+}
+
 a:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--bg);
+  background: #388bfd66;
+  color: var(--ink);
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  border-radius: 0;
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  padding: 0.3rem 0.5rem;
+}
+
+.field:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

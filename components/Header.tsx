@@ -1,14 +1,8 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { Nav } from "@/components/Nav";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isAllowedEmail } from "@/lib/authz";
-import { site } from "@/lib/site";
-
-const nav = [
-  { href: "/", label: "Board" },
-  { href: "/work", label: "Work" },
-  { href: "/about", label: "About" },
-] as const;
 
 export async function Header() {
   const session = await auth();
@@ -16,21 +10,17 @@ export async function Header() {
 
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-6xl items-baseline justify-between gap-6 px-5 py-4 sm:px-8">
-        <Link
-          href="/"
-          className="font-serif text-lg tracking-tight text-ink no-underline hover:text-accent"
-        >
-          {site.name}
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
+        <Link href="/" className="text-ink no-underline hover:text-accent">
+          <span className="text-ok">sven</span>
+          <span className="text-ink-dim">@</span>
+          <span className="text-accent">ops</span>
+          <span className="text-ink-dim">:~$</span>
         </Link>
-        <nav aria-label="Primary" className="flex gap-5 text-sm text-ink-dim">
-          {nav.map((item) => (
-            <Link key={item.href} href={item.href} className="hover:text-ink">
-              {item.label}
-            </Link>
-          ))}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <Nav />
           {showSignOut ? <SignOutButton /> : null}
-        </nav>
+        </div>
       </div>
     </header>
   );

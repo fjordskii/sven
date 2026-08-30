@@ -1,4 +1,5 @@
 import { signOut } from "@/auth";
+import { TermButton } from "@/components/term";
 
 export function SignOutButton() {
   return (
@@ -8,9 +9,9 @@ export function SignOutButton() {
         await signOut({ redirectTo: "/sign-in" });
       }}
     >
-      <button type="submit" className="hover:text-ink">
-        Sign out
-      </button>
+      <TermButton type="submit" tone="muted">
+        sign out
+      </TermButton>
     </form>
   );
 }

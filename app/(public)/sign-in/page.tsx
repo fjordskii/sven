@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
+import { PageShell, TermButton } from "@/components/term";
 import { isAllowedEmail, safeCallbackUrl } from "@/lib/authz";
 
 export const metadata = {
@@ -24,30 +25,23 @@ export default async function SignInPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-12 sm:px-8 sm:py-16">
-      <p className="font-mono text-xs tracking-[0.18em] text-accent uppercase">
-        Sign in
-      </p>
-      <h1 className="mt-3 font-serif text-4xl tracking-tight text-ink sm:text-5xl">
-        Continue with Google
-      </h1>
-      <p className="mt-6 max-w-md text-base leading-relaxed text-ink-dim">
-        This site is not public. Sign in with the Google account that owns it.
-      </p>
+    <PageShell
+      cwd="~/sign-in"
+      title="continue with Google"
+      lead={
+        <p>This site is not public. Sign in with the Google account that owns it.</p>
+      }
+    >
       <form
-        className="mt-10"
         action={async () => {
           "use server";
           await signIn("google", { redirectTo: callbackUrl });
         }}
       >
-        <button
-          type="submit"
-          className="border border-line bg-bg-raised px-4 py-2 text-sm text-ink hover:border-accent hover:text-accent"
-        >
-          Continue with Google
-        </button>
+        <TermButton type="submit" tone="accent">
+          continue with google
+        </TermButton>
       </form>
-    </div>
+    </PageShell>
   );
 }

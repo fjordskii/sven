@@ -1,6 +1,7 @@
 import { CalendarStrip } from "@/components/CalendarStrip";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { NewItemForm } from "@/components/NewItemForm";
+import { PageShell, TermFrame } from "@/components/term";
 import { formatDay, formatWeekday } from "@/lib/dates";
 import type { Agenda, WorkItem } from "@/lib/journal";
 import type { StorageStatus } from "@/lib/journal-store";
@@ -15,41 +16,43 @@ export function JournalBoard({
   storage: StorageStatus;
 }) {
   return (
-    <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
-      <p className="font-mono text-xs tracking-[0.18em] text-accent uppercase">
-        Board · {formatWeekday(agenda.today)} {formatDay(agenda.today)}
-      </p>
-      <h1 className="mt-3 font-serif text-5xl tracking-tight text-ink sm:text-6xl">
-        The desk
-      </h1>
-      <p className="mt-5 max-w-2xl text-base leading-relaxed text-ink-dim">
-        In progress, left to do, and done — plus what is due in the coming
-        days. Agents connect over MCP with Google OAuth. You can edit here
-        too.
+    <PageShell
+      cwd="~/desk"
+      title="the desk"
+      wide
+      lead={
+        <p>
+          In progress, left to do, and done — plus what is due in the coming
+          days. Agents connect over MCP with Google OAuth. You can edit here
+          too.
+        </p>
+      }
+    >
+      <p className="mb-6 text-[13px] text-ink-dim">
+        <span className="text-warn">#</span> {formatWeekday(agenda.today)}{" "}
+        {formatDay(agenda.today)}
       </p>
 
       {!storage.ready ? (
-        <div className="mt-8 border border-accent bg-bg-raised p-4 text-sm leading-relaxed text-ink">
-          <p className="font-medium">Storage is not connected.</p>
-          <p className="mt-2 text-ink-dim">
+        <TermFrame title="storage" tone="warn" className="mb-6">
+          <p className="text-warn">Storage is not connected.</p>
+          <p className="mt-2 text-sm text-ink-dim">
             {storage.message} In the Vercel project: Storage → Create Database
             → Blob → access <strong className="text-ink">Private</strong> →
             connect to Production (and Preview). Then redeploy.
           </p>
-        </div>
+        </TermFrame>
       ) : null}
 
-      <div className="mt-10">
-        <CalendarStrip agenda={agenda} />
-      </div>
+      <CalendarStrip agenda={agenda} />
 
-      <div className="mt-10">
+      <div className="mt-6">
         <KanbanBoard items={items} />
       </div>
 
-      <div className="mt-10 max-w-2xl">
+      <div className="mt-6 max-w-2xl">
         <NewItemForm />
       </div>
-    </div>
+    </PageShell>
   );
 }
