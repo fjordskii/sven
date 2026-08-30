@@ -5,7 +5,7 @@ import { isAllowedEmail } from "@/lib/authz";
 import { site } from "@/lib/site";
 
 const nav = [
-  { href: "/", label: "Home" },
+  { href: "/", label: "Board" },
   { href: "/work", label: "Work" },
   { href: "/about", label: "About" },
 ] as const;
@@ -16,7 +16,7 @@ export async function Header() {
 
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-3xl items-baseline justify-between gap-6 px-5 py-4 sm:px-8">
+      <div className="mx-auto flex max-w-6xl items-baseline justify-between gap-6 px-5 py-4 sm:px-8">
         <Link
           href="/"
           className="font-serif text-lg tracking-tight text-ink no-underline hover:text-accent"

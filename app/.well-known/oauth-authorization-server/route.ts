@@ -1,0 +1,16 @@
+import {
+  authorizationServerMetadata,
+  issuerFromRequest,
+  oauthCorsHeaders,
+  oauthJson,
+} from "@/lib/oauth";
+
+export const dynamic = "force-dynamic";
+
+export function GET(request: Request) {
+  return oauthJson(authorizationServerMetadata(issuerFromRequest(request)));
+}
+
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: oauthCorsHeaders });
+}
