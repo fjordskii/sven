@@ -1,5 +1,7 @@
 "use client";
 
+import { TermButton } from "@/components/term";
+
 export default function AuthorizeError({
   reset,
 }: {
@@ -7,24 +9,24 @@ export default function AuthorizeError({
   reset: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-xl px-5 py-12 sm:px-8 sm:py-16">
-      <p className="font-mono text-xs tracking-[0.18em] text-accent uppercase">
-        OAuth
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <p className="text-[13px] leading-6 text-ink-dim">
+        <span className="text-ok">sven</span>@
+        <span className="text-accent">ops</span>:
+        <span className="text-purple">~/oauth</span>
       </p>
-      <h1 className="mt-3 font-serif text-4xl tracking-tight text-ink">
-        Authorization failed
+      <h1 className="mt-1 text-xl text-ink sm:text-2xl">
+        authorization failed
       </h1>
-      <p className="mt-5 text-base leading-relaxed text-ink-dim">
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-dim">
         The consent page hit an unexpected error. Reload and try the agent
         request again.
       </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="mt-8 border border-line bg-bg-raised px-4 py-2 text-sm text-ink hover:border-accent hover:text-accent"
-      >
-        Try again
-      </button>
+      <div className="mt-6">
+        <TermButton type="button" onClick={reset} tone="accent">
+          try again
+        </TermButton>
+      </div>
     </div>
   );
 }
