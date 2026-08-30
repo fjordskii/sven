@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { auth } from "@/auth";
+import { SignOutButton } from "@/components/SignOutButton";
+import { isAllowedEmail } from "@/lib/authz";
 import { site } from "@/lib/site";
 
 const nav = [
@@ -7,7 +10,10 @@ const nav = [
   { href: "/about", label: "About" },
 ] as const;
 
-export function Header() {
+export async function Header() {
+  const session = await auth();
+  const showSignOut = isAllowedEmail(session?.user?.email);
+
   return (
     <header className="border-b border-line">
       <div className="mx-auto flex max-w-3xl items-baseline justify-between gap-6 px-5 py-4 sm:px-8">
@@ -19,14 +25,11 @@ export function Header() {
         </Link>
         <nav aria-label="Primary" className="flex gap-5 text-sm text-ink-dim">
           {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="hover:text-ink"
-            >
+            <Link key={item.href} href={item.href} className="hover:text-ink">
               {item.label}
             </Link>
           ))}
+          {showSignOut ? <SignOutButton /> : null}
         </nav>
       </div>
     </header>
