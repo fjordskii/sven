@@ -10,14 +10,17 @@ test("Google allowlist stays exact and case-insensitive", () => {
   assert.equal(isAllowedEmail(null), false);
 });
 
-test("MCP is public to the proxy; site pages are not", () => {
+test("MCP and OAuth machine endpoints are public; authorize and site pages are not", () => {
   assert.equal(isPublicPath("/mcp"), true);
-  assert.equal(isPublicPath("/mcp/"), true);
+  assert.equal(isPublicPath("/.well-known/oauth-protected-resource"), true);
+  assert.equal(isPublicPath("/.well-known/oauth-authorization-server"), true);
+  assert.equal(isPublicPath("/oauth/register"), true);
+  assert.equal(isPublicPath("/oauth/token"), true);
+  assert.equal(isPublicPath("/oauth/revoke"), true);
   assert.equal(isPublicPath("/sign-in"), true);
-  assert.equal(isPublicPath("/api/auth/callback/google"), true);
+  assert.equal(isPublicPath("/oauth/authorize"), false);
   assert.equal(isPublicPath("/"), false);
   assert.equal(isPublicPath("/about"), false);
-  assert.equal(isPublicPath("/work"), false);
 });
 
 test("callback URLs stay same-origin relative", () => {

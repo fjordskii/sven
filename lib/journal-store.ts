@@ -1,12 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { AgentTokenRecord } from "./agent-tokens";
-import type { WorkItem } from "./journal";
+import type { AuthCodeRecord, OAuthClient, RefreshRecord } from "./oauth";
+import type { WorkItem } from "./journal-model";
 
 export type StoreDoc = {
   version: 1;
   items: WorkItem[];
-  tokens: AgentTokenRecord[];
+  oauthClients: OAuthClient[];
+  oauthCodes: AuthCodeRecord[];
+  oauthRefresh: RefreshRecord[];
 };
 
 export type StoreKind = "blob" | "file" | "memory" | "unconfigured";
@@ -29,7 +31,13 @@ let overrideStore: JournalStore | null = null;
 let defaultStore: JournalStore | null = null;
 
 export function emptyDoc(): StoreDoc {
-  return { version: 1, items: [], tokens: [] };
+  return {
+    version: 1,
+    items: [],
+    oauthClients: [],
+    oauthCodes: [],
+    oauthRefresh: [],
+  };
 }
 
 export function setStoreForTests(store: JournalStore | null): void {
@@ -41,7 +49,9 @@ export function createMemoryStore(initial?: Partial<StoreDoc>): JournalStore {
     ...emptyDoc(),
     ...initial,
     items: initial?.items ? [...initial.items] : [],
-    tokens: initial?.tokens ? [...initial.tokens] : [],
+    oauthClients: initial?.oauthClients ? [...initial.oauthClients] : [],
+    oauthCodes: initial?.oauthCodes ? [...initial.oauthCodes] : [],
+    oauthRefresh: initial?.oauthRefresh ? [...initial.oauthRefresh] : [],
   };
   return {
     kind: "memory",
@@ -59,7 +69,9 @@ function cloneDoc(doc: StoreDoc): StoreDoc {
   return {
     version: 1,
     items: [...doc.items],
-    tokens: [...doc.tokens],
+    oauthClients: [...doc.oauthClients],
+    oauthCodes: [...doc.oauthCodes],
+    oauthRefresh: [...doc.oauthRefresh],
   };
 }
 
@@ -68,8 +80,14 @@ function parseDoc(raw: string): StoreDoc {
   return {
     version: 1,
     items: Array.isArray(parsed.items) ? (parsed.items as WorkItem[]) : [],
-    tokens: Array.isArray(parsed.tokens)
-      ? (parsed.tokens as AgentTokenRecord[])
+    oauthClients: Array.isArray(parsed.oauthClients)
+      ? (parsed.oauthClients as OAuthClient[])
+      : [],
+    oauthCodes: Array.isArray(parsed.oauthCodes)
+      ? (parsed.oauthCodes as AuthCodeRecord[])
+      : [],
+    oauthRefresh: Array.isArray(parsed.oauthRefresh)
+      ? (parsed.oauthRefresh as RefreshRecord[])
       : [],
   };
 }

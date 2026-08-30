@@ -17,7 +17,11 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/denied" ||
     pathname.startsWith("/api/auth") ||
     pathname === "/mcp" ||
-    pathname.startsWith("/mcp/")
+    pathname.startsWith("/mcp/") ||
+    pathname.startsWith("/.well-known/") ||
+    pathname === "/oauth/register" ||
+    pathname === "/oauth/token" ||
+    pathname === "/oauth/revoke"
   );
 }
 

@@ -1,11 +1,11 @@
 # Sven
 
-Ford Heacock's home base: a private ops journal plus a remote MCP server
-that any of his agents can authenticate into and publish to.
+Ford Heacock's home base: a private Kanban + calendar, and a remote MCP
+server that agents authorize through Google OAuth.
 
-The public-facing `/about` and `/work` pages stay as they were. Signed-in
-home is the journal. The site is gated with Google OAuth (Auth.js). Only
-one email can view it. Agents do not use Google — they use a bearer token.
+`/about` and `/work` stay as they were. Signed-in home is the board. The
+site is gated with Google OAuth (Auth.js). Only one email can view it or
+approve an MCP client.
 
 ## Local
 
@@ -15,192 +15,155 @@ below). Then install and:
 - script `dev` — local server at http://localhost:3000
 - script `build` — production build
 - script `start` — serve the production build
-- script `test` — journal, token, and allowlist unit tests
-
-See package.json for the exact commands.
+- script `test` — journal, OAuth, and allowlist unit tests
 
 Without Vercel Blob, the journal writes JSON under `.data/` (gitignored).
-That is enough for local development.
 
-## Auth (Google for humans)
+## Auth (Google for humans, and for MCP consent)
 
 The app uses [Auth.js](https://authjs.dev) (`next-auth` v5) with the Google
-provider. This is application-level auth. Do **not** turn on Vercel
-Deployment Protection / Vercel Authentication for this project; that SSO is a
-different gate and would block both Google sign-in and MCP tokens.
+provider. This is the only login. MCP clients do **not** get a pasted API
+token. They run OAuth 2.1 against this app; Ford signs in with the same
+Google account and approves the client. After consent, the authorization
+server issues a short-lived access token (and refresh token) for `/mcp`.
 
-Anyone who is not signed in is sent to `/sign-in`, then back to the page they
-asked for. Google accounts other than the owner are denied. Auth endpoints
-(`/api/auth/*`), the sign-in / denied pages, and `/mcp` stay reachable. `/mcp`
-still requires a valid agent bearer token.
+Do **not** turn on Vercel Deployment Protection / Vercel Authentication.
+That SSO would block both Google sign-in and the MCP OAuth endpoints.
 
 ### Environment variables
 
-Set these in `.env.local` for development and in the Vercel project
-(Production, and Preview if you will test OAuth there).
-
 | Name | Required | Notes |
 | --- | --- | --- |
-| `AUTH_SECRET` | yes | Random string used to encrypt the session cookie and, by default, HMAC-hash agent tokens. Generate with `npx auth secret`. |
+| `AUTH_SECRET` | yes | Session cookie + signing key for MCP access tokens. `npx auth secret`. |
 | `AUTH_GOOGLE_ID` | yes | Google Cloud OAuth 2.0 client ID. |
 | `AUTH_GOOGLE_SECRET` | yes | Google Cloud OAuth 2.0 client secret. |
-| `AUTH_URL` | no | Full origin, e.g. `http://localhost:3000` or `https://sven-beige.vercel.app`. Auth.js infers this on Vercel from the request host (`trustHost`). Set it locally if callbacks go to the wrong origin. |
-| `AUTH_ALLOWED_EMAIL` | no | Only this Google email may view the site (case-insensitive). Defaults to `fordheacock@gmail.com`. |
-| `JOURNAL_TOKEN_PEPPER` | no | Optional extra HMAC pepper for agent tokens. Falls back to `AUTH_SECRET`. |
+| `AUTH_URL` | recommended in production | Stable origin, e.g. `https://sven-fjordskiis-projects.vercel.app`. Used as the OAuth issuer. |
+| `AUTH_ALLOWED_EMAIL` | no | Only this Google email may view the site or approve MCP clients. Defaults to `fordheacock@gmail.com`. |
 | `JOURNAL_TZ` | no | Timezone for today / coming-days. Defaults to `America/New_York`. |
 | `JOURNAL_DATA_DIR` | no | Local JSON directory when Blob is not configured. Defaults to `.data`. |
-| `BLOB_READ_WRITE_TOKEN` | production | Injected when you create and connect a Vercel Blob store. Required on Vercel so the journal persists across deploys. |
+| `BLOB_READ_WRITE_TOKEN` | production | Injected when you create and connect a Vercel Blob store. |
 
-Do not commit secrets. `.env*` is gitignored except `.env.example`.
+### Google Cloud OAuth client — extra origins Ford must add
 
-### Google Cloud OAuth client
-
-In [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-create an OAuth 2.0 Client ID of type **Web application**.
-
-Auth.js callback path is always `/api/auth/callback/google`.
+Auth.js callback path is always `/api/auth/callback/google`. MCP clients
+never talk to Google directly; they talk to this app, which then uses the
+existing Google session.
 
 **Authorized JavaScript origins**
 
 - `http://localhost:3000`
-- `https://sven-beige.vercel.app` (current production host)
+- `https://sven-fjordskiis-projects.vercel.app`
+- `https://sven-beige.vercel.app` (older production host, if still in use)
 
 **Authorized redirect URIs**
 
 - `http://localhost:3000/api/auth/callback/google`
+- `https://sven-fjordskiis-projects.vercel.app/api/auth/callback/google`
 - `https://sven-beige.vercel.app/api/auth/callback/google`
 
-There is no custom domain yet. Use the exact `*.vercel.app` hostname from the
-Vercel project (Project → Settings → Domains). Google does not allow wildcard
-redirect URIs, so each Preview deployment hostname must be added separately if
-you need Google sign-in on that preview.
-
-After creating the client, put the client ID and secret in `AUTH_GOOGLE_ID`
-and `AUTH_GOOGLE_SECRET`, then redeploy.
+Google does not allow wildcard redirect URIs. Add each Preview
+`*.vercel.app` hostname separately if that preview needs Google sign-in.
 
 ### Disable Vercel Authentication
 
-In the Vercel project: **Settings → Deployment Protection**. Turn **off**
-**Vercel Authentication** (the vercel.com/login SSO). The gates are Google
-(humans) and MCP bearer tokens (agents), not platform SSO. If Vercel
-Authentication stays on, external agents cannot reach `/mcp`.
+**Settings → Deployment Protection → Vercel Authentication: off.**
+
+The gates are Google (humans + MCP consent) and OAuth access tokens
+(agents). If platform SSO stays on, agents cannot complete discovery or
+the token exchange.
 
 ## Storage (Vercel Blob, Hobby)
 
-The journal and hashed tokens persist in a **private** Vercel Blob object
-(`sven/journal.json`). Blob has a free allowance on Hobby. This is
-first-party Vercel storage, not a paid auth/db product.
+Journal items and OAuth client/code/refresh rows persist in a **private**
+Vercel Blob object. Blob has a free allowance on Hobby.
 
-**Ford must create the store once:**
+**Create the store once:**
 
-1. Open the project: [sven on Vercel](https://vercel.com/fjordskiis-projects/sven)
+1. Open [sven on Vercel](https://vercel.com/fjordskiis-projects/sven)
 2. Sidebar → **Storage**
-3. **Create Database**
-4. Choose **Blob**
-5. Set access to **Private** (this cannot be changed later)
-6. Name it something like `sven-journal`
-7. Connect it to **Production** (and **Preview** / **Development** if you want those environments to share or have their own store)
-8. Create, then **redeploy** so `BLOB_READ_WRITE_TOKEN` is available to the app
+3. **Create Database** → **Blob**
+4. Access: **Private**
+5. Name: `sven-journal`
+6. Connect to **Production** (and Preview / Development if you want)
+7. Create, then **redeploy**
 
-Until that store exists, the signed-in journal shows a setup note. Local
-`next dev` without Blob uses `.data/journal.json`.
-
-## Remote MCP
+## Remote MCP (OAuth 2.1)
 
 Production MCP URL:
 
 ```
-https://sven-beige.vercel.app/mcp
+https://sven-fjordskiis-projects.vercel.app/mcp
 ```
 
-Local:
+Local: `http://localhost:3000/mcp`
 
-```
-http://localhost:3000/mcp
-```
+This app is both the MCP resource server and the authorization server.
 
-Streamable HTTP (MCP spec 2026-07-28, with a 2025-era fallback). Agents
-authenticate with `Authorization: Bearer <token>`. Missing or invalid tokens
-are rejected with `401`. Humans keep Google; agents never use Google OAuth.
-
-Mint and revoke tokens on the signed-in journal (shown once, HMAC-hashed at
-rest). Token names and platforms become the default `source` on items that
-agent publishes.
-
-### Tools
-
-| Tool | Purpose |
+| Endpoint | Role |
 | --- | --- |
-| `list_board` | In-flight / next / done. Start a session here. |
-| `get_today_upcoming` | Today plus coming days, derived from dates and in-flight work. |
-| `publish_item` | Create (or replace by id) an item. Use when you start, finish, or assign Ford a next step. |
-| `update_item` | Change title, notes, status, or date. |
-| `mark_done` | Close an item, optional closing note. |
-| `add_note` | Append a dated note without changing status. |
+| `/mcp` | Streamable HTTP MCP. Bearer access token required. |
+| `/.well-known/oauth-protected-resource` | RFC 9728 Protected Resource Metadata |
+| `/.well-known/oauth-authorization-server` | RFC 8414 Authorization Server Metadata |
+| `/oauth/register` | Dynamic Client Registration (RFC 7591, fallback) |
+| `/oauth/authorize` | Authorization code + PKCE. Requires Google (allowlist). |
+| `/oauth/token` | Code and refresh-token exchange |
+| `/oauth/revoke` | Refresh-token revocation |
 
-Tool descriptions tell calling agents to report work they started, finished,
-or that Ford needs to do next.
+`client_id_metadata_document_supported` is advertised for CIMD. DCR remains
+for clients that still register that way. After Ford consents with
+`fordheacock@gmail.com`, the server issues an access token. That token is
+an internal OAuth credential — not a secret Ford pastes into agents.
 
 ### Add in Cursor
 
-Cursor Settings → MCP → add a remote / HTTP server:
+Cursor Settings → MCP → add a remote HTTP server. Point it at the URL only.
+Cursor should start the OAuth flow (401 → PRM → authorize in a browser →
+token). Do **not** add a static `Authorization` header.
 
 ```json
 {
   "mcpServers": {
     "sven-journal": {
-      "url": "https://sven-beige.vercel.app/mcp",
-      "headers": {
-        "Authorization": "Bearer sven_…your-token…"
-      }
+      "url": "https://sven-fjordskiis-projects.vercel.app/mcp"
     }
   }
 }
 ```
 
-In `mcp.json` the shape is the same: a URL plus an `Authorization` header.
-Do not commit the token.
+When the browser opens, sign in with the owner Google account and click
+**Approve**.
 
 ### Generic MCP HTTP client
 
-Any Streamable HTTP client (ChatGPT custom MCP, Claude, Grok Bot, cloud
-agents, `mcp-remote`):
+Any Streamable HTTP client (ChatGPT custom MCP, Claude, Grok, cloud agents):
 
-- URL: `https://sven-beige.vercel.app/mcp`
-- Header: `Authorization: Bearer <token>`
-- Method: POST JSON-RPC (`initialize`, `tools/list`, `tools/call`)
+- **URL:** `https://sven-fjordskiis-projects.vercel.app/mcp`
+- **Auth:** OAuth 2.1 (PKCE). Follow Protected Resource Metadata.
+- Do not paste a bearer token as the primary setup.
 
-Stdio-only clients can wrap it:
+Stdio-only clients can wrap the URL with `mcp-remote`; the wrapper still
+needs to complete the OAuth redirect.
 
-```json
-{
-  "sven-journal": {
-    "command": "npx",
-    "args": ["-y", "mcp-remote", "https://sven-beige.vercel.app/mcp", "--header", "Authorization: Bearer sven_…"]
-  }
-}
-```
+### Tools
 
-## Deploy on Vercel (hobby / free)
+| Tool | Purpose |
+| --- | --- |
+| `list_board` | In progress / left to do / done |
+| `get_today_upcoming` | Today plus coming days |
+| `publish_item` | Create or replace an item |
+| `update_item` | Change title, notes, status, or due date |
+| `mark_done` | Close an item |
+| `add_note` | Append a dated note |
 
-Import https://github.com/fjordskii/sven in the Vercel dashboard.
-
-- Framework preset: Next.js
-- Root directory: repository root
-- Keep the default Next.js build
-- Add the Auth.js env vars
-- Create the private Blob store (steps above)
-- Keep Vercel Authentication **off**
-
-Hobby is enough. No paid auth or database product.
+Statuses: `in_progress` / `in_flight`, `next` / `left_to_do`, `done`.
+Due date field: `due_date` or `for_date` (`YYYY-MM-DD`).
 
 ## Public work log
 
-`/work` is still the dated public log. Edit `lib/work.ts` and push a new
-object onto the work array (slug, title, date, summary, body). That is
-separate from the private journal.
+`/work` is still the dated public log in `lib/work.ts`. Separate from the
+private board.
 
 ## Stack
 
 Next.js App Router, TypeScript, Tailwind CSS, Auth.js (Google), Vercel Blob,
-MCP Streamable HTTP (`mcp-handler` + `@modelcontextprotocol/server`).
+MCP Streamable HTTP, OAuth 2.1 on this same app.

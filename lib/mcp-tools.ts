@@ -5,22 +5,36 @@ import {
   getAgenda,
   getItem,
   groupByStatus,
-  isItemStatus,
   listItems,
   markDone,
+  normalizeStatus,
   publishItem,
   updateItem,
-  type ItemStatus,
 } from "@/lib/journal";
 
-const statusSchema = z.enum(["in_flight", "done", "next"]);
+const statusSchema = z.enum([
+  "in_flight",
+  "in_progress",
+  "next",
+  "todo",
+  "left_to_do",
+  "done",
+]);
+
+const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .optional()
+  .nullable();
 
 export const JOURNAL_INSTRUCTIONS = `You are writing to Ford Heacock's private ops journal on Sven.
 
+The signed-in home is a Kanban (in progress / left to do / done) plus a calendar of due dates.
+
 Use these tools to keep the board honest:
-- When you start work, publish or update an item with status in_flight.
-- When you finish work, mark it done (or publish it as done) and leave a short note about what landed.
-- When Ford needs to do something, publish a next item with a for_date if you know the day.
+- When you start work, publish or update an item with status in_progress (or in_flight).
+- When you finish work, mark it done and leave a short note about what landed.
+- When Ford needs to do something, publish a next / left_to_do item with a due date if you know the day.
 - At the start of a session, list the board or get today/upcoming so you do not duplicate work.
 
 Do not invent private emails, AgentMail addresses, or secrets in titles or notes.`;
@@ -59,11 +73,8 @@ export const publishItemInput = z.object({
   title: z.string().min(1).max(240),
   notes: z.string().optional(),
   status: statusSchema.optional(),
-  for_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .nullable(),
+  for_date: dateSchema,
+  due_date: dateSchema,
   source_agent: z.string().optional(),
   source_platform: z.string().optional(),
 });
@@ -73,11 +84,8 @@ export const updateItemInput = z.object({
   title: z.string().min(1).max(240).optional(),
   notes: z.string().optional(),
   status: statusSchema.optional(),
-  for_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .nullable(),
+  for_date: dateSchema,
+  due_date: dateSchema,
   source_agent: z.string().optional(),
   source_platform: z.string().optional(),
 });
@@ -96,15 +104,16 @@ export async function toolListBoard(args: z.infer<typeof listBoardInput>) {
   const items = await listItems();
   const grouped = groupByStatus(items);
   if (args.status) {
+    const status = normalizeStatus(args.status) ?? "next";
     return jsonResult({
-      status: args.status,
-      items: grouped[args.status],
+      status,
+      items: grouped[status],
       actor: getActor(),
     });
   }
   return jsonResult({
-    in_flight: grouped.in_flight,
-    next: grouped.next,
+    in_progress: grouped.in_flight,
+    left_to_do: grouped.next,
     done: grouped.done.slice(0, 20),
     actor: getActor(),
   });
@@ -134,7 +143,7 @@ export async function toolPublishItem(
     title: args.title,
     notes: args.notes,
     status: args.status,
-    forDate: args.for_date,
+    forDate: args.due_date ?? args.for_date,
     sourceAgent: args.source_agent ?? defaults.sourceAgent,
     sourcePlatform: args.source_platform ?? defaults.sourcePlatform,
   });
@@ -147,7 +156,7 @@ export async function toolUpdateItem(args: z.infer<typeof updateItemInput>) {
     title: args.title,
     notes: args.notes,
     status: args.status,
-    forDate: args.for_date,
+    forDate: args.due_date ?? args.for_date,
     sourceAgent: args.source_agent,
     sourcePlatform: args.source_platform,
   });
@@ -173,6 +182,3 @@ export function asToolError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unknown error";
   return errorResult(message);
 }
-
-export { isItemStatus };
-export type { ItemStatus };

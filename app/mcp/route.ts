@@ -1,9 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { runWithActor, type Actor } from "@/lib/actor";
-import {
-  verifyAgentToken,
-  type AgentTokenPublic,
-} from "@/lib/agent-tokens";
+import { issuerFromRequest } from "@/lib/oauth";
+import { verifyMcpAccessToken } from "@/lib/oauth-grant";
 import {
   addNoteInput,
   JOURNAL_INSTRUCTIONS,
@@ -33,14 +31,6 @@ const corsHeaders = {
   "Access-Control-Expose-Headers": "MCP-Protocol-Version, MCP-Session-Id",
 };
 
-function actorFromToken(token: AgentTokenPublic): Actor {
-  return {
-    kind: "agent",
-    name: token.name,
-    platform: token.platform ?? "mcp",
-  };
-}
-
 const mcp = createMcpHandler(
   (server) => {
     server.registerTool(
@@ -48,7 +38,7 @@ const mcp = createMcpHandler(
       {
         title: "List journal board",
         description:
-          "List Ford's living ops journal grouped by in_flight, next, and done. Call this when you start a session so you know what is already in motion. Then report work you started, finished, or that Ford needs to do next.",
+          "List Ford's living ops journal grouped by in progress (in_flight), left to do (next), and done. Call this when you start a session so you know what is already in motion. Then report work you started, finished, or that Ford needs to do next.",
         inputSchema: listBoardInput,
       },
       async (args) => {
@@ -65,7 +55,7 @@ const mcp = createMcpHandler(
       {
         title: "Today and coming days",
         description:
-          "Get today's desk and the coming days. Today includes dated items plus in-flight work that is due or has no future date. Use this to decide what Ford should do today versus later.",
+          "Get today's desk and the coming days. Today includes dated items plus in-progress work that is due or has no future date. Use this to decide what Ford should do today versus later.",
         inputSchema: todayUpcomingInput,
       },
       async (args) => {
@@ -82,7 +72,7 @@ const mcp = createMcpHandler(
       {
         title: "Publish journal item",
         description:
-          "Create a journal item (or replace one if you pass id). Use in_flight when you start work, done when you finish, and next when Ford needs to do something. Set for_date as YYYY-MM-DD when you know the day. Include notes with enough context that Ford can act without the chat transcript.",
+          "Create a journal item (or replace one if you pass id). Use in_flight / in_progress when you start work, done when you finish, and next when Ford needs to do something. Set for_date or due_date as YYYY-MM-DD when you know the day.",
         inputSchema: publishItemInput,
       },
       async (args) => {
@@ -99,7 +89,7 @@ const mcp = createMcpHandler(
       {
         title: "Update journal item",
         description:
-          "Update an existing journal item by id. Change status, title, notes, or for_date. Use this instead of creating a duplicate when the work is already on the board.",
+          "Update an existing journal item by id. Change status, title, notes, or due date. Use this instead of creating a duplicate when the work is already on the board.",
         inputSchema: updateItemInput,
       },
       async (args) => {
@@ -154,6 +144,10 @@ const mcp = createMcpHandler(
   },
 );
 
+function actorFromClaims(name: string, platform: string): Actor {
+  return { kind: "agent", name, platform };
+}
+
 const authorized = withMcpAuth(
   async (req) => {
     const extra = req.auth?.extra as Actor | undefined;
@@ -164,19 +158,23 @@ const authorized = withMcpAuth(
     };
     return runWithActor(actor, () => mcp(req));
   },
-  async (_req, bearerToken) => {
+  async (req, bearerToken) => {
     if (!bearerToken) return undefined;
-    const record = await verifyAgentToken(bearerToken);
-    if (!record) return undefined;
+    const issuer = issuerFromRequest(req);
+    const claims = await verifyMcpAccessToken(bearerToken, issuer);
+    if (!claims) return undefined;
     return {
       token: bearerToken,
-      clientId: record.id,
-      scopes: ["journal"],
-      expiresAt: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 10,
-      extra: actorFromToken(record),
+      clientId: claims.client_id,
+      scopes: claims.scope.split(/[ +]/),
+      expiresAt: claims.exp,
+      extra: actorFromClaims(claims.client_name, "mcp"),
     };
   },
-  { required: true },
+  {
+    required: true,
+    resourceMetadataPath: "/.well-known/oauth-protected-resource",
+  },
 );
 
 function withCors(response: Response): Response {

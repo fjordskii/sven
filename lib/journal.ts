@@ -1,32 +1,31 @@
 import { actorLabel, getActor, type Actor } from "./actor";
 import { addDays, dateInZone, isIsoDate, journalTimeZone } from "./dates";
 import {
+  normalizeStatus,
+  sortItems,
+  type ItemStatus,
+  type WorkItem,
+} from "./journal-model";
+import {
   getStore,
   type JournalStore,
   type StoreDoc,
 } from "./journal-store";
 
-export const ITEM_STATUSES = ["in_flight", "done", "next"] as const;
-export type ItemStatus = (typeof ITEM_STATUSES)[number];
-
-export type WorkItem = {
-  id: string;
-  title: string;
-  notes: string;
-  status: ItemStatus;
-  forDate: string | null;
-  sourceAgent: string | null;
-  sourcePlatform: string | null;
-  createdAt: string;
-  updatedAt: string;
-  updatedBy: string;
-};
+export type { ItemStatus, WorkItem } from "./journal-model";
+export {
+  ITEM_STATUSES,
+  STATUS_LABEL,
+  groupByStatus,
+  isItemStatus,
+  normalizeStatus,
+} from "./journal-model";
 
 export type PublishItemInput = {
   id?: string;
   title: string;
   notes?: string;
-  status?: ItemStatus;
+  status?: ItemStatus | string;
   forDate?: string | null;
   sourceAgent?: string | null;
   sourcePlatform?: string | null;
@@ -36,7 +35,7 @@ export type UpdateItemInput = {
   id: string;
   title?: string;
   notes?: string;
-  status?: ItemStatus;
+  status?: ItemStatus | string;
   forDate?: string | null;
   sourceAgent?: string | null;
   sourcePlatform?: string | null;
@@ -55,10 +54,6 @@ export type Agenda = {
 };
 
 const COMING_DAYS = 7;
-
-export function isItemStatus(value: string): value is ItemStatus {
-  return (ITEM_STATUSES as readonly string[]).includes(value);
-}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -87,17 +82,6 @@ function normalizeOptional(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, 80) : null;
-}
-
-function sortItems(items: WorkItem[]): WorkItem[] {
-  return [...items].sort((a, b) => {
-    if (a.forDate && b.forDate && a.forDate !== b.forDate) {
-      return a.forDate < b.forDate ? -1 : 1;
-    }
-    if (a.forDate && !b.forDate) return -1;
-    if (!a.forDate && b.forDate) return 1;
-    return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0;
-  });
 }
 
 async function mutate(
@@ -171,8 +155,7 @@ export async function publishItem(
 ): Promise<WorkItem> {
   const title = normalizeTitle(input.title);
   const notes = normalizeNotes(input.notes);
-  const status = input.status ?? "in_flight";
-  if (!isItemStatus(status)) throw new Error("Invalid status.");
+  const status = normalizeStatus(input.status) ?? "in_flight";
   const forDate = normalizeDate(input.forDate);
   const sourceAgent =
     normalizeOptional(input.sourceAgent) ??
@@ -249,11 +232,7 @@ export async function updateItem(
       status:
         input.status === undefined
           ? existing.status
-          : isItemStatus(input.status)
-            ? input.status
-            : (() => {
-                throw new Error("Invalid status.");
-              })(),
+          : (normalizeStatus(input.status) ?? existing.status),
       forDate:
         input.forDate === undefined
           ? existing.forDate
@@ -323,10 +302,3 @@ export async function addNote(
   return saved;
 }
 
-export function groupByStatus(items: WorkItem[]): Record<ItemStatus, WorkItem[]> {
-  return {
-    in_flight: sortItems(items.filter((item) => item.status === "in_flight")),
-    next: sortItems(items.filter((item) => item.status === "next")),
-    done: sortItems(items.filter((item) => item.status === "done")),
-  };
-}

@@ -36,13 +36,13 @@ export function NewItemForm() {
             defaultValue="next"
             className="mt-1 w-full border border-line bg-bg px-3 py-2 text-ink"
           >
-            <option value="next">Next</option>
-            <option value="in_flight">In flight</option>
+            <option value="next">Left to do</option>
+            <option value="in_flight">In progress</option>
             <option value="done">Done</option>
           </select>
         </label>
         <label className="block text-sm text-ink-dim">
-          For date
+          Due date
           <input
             type="date"
             name="forDate"

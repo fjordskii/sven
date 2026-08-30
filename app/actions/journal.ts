@@ -4,11 +4,10 @@ import { revalidatePath } from "next/cache";
 import { FORD_ACTOR, runWithActor } from "@/lib/actor";
 import {
   addNote,
-  isItemStatus,
   markDone,
+  normalizeStatus,
   publishItem,
   updateItem,
-  type ItemStatus,
 } from "@/lib/journal";
 import { requireOwner } from "@/lib/require-owner";
 
@@ -23,8 +22,7 @@ async function withOwner<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export async function createItemAction(formData: FormData): Promise<void> {
-  const statusRaw = readString(formData, "status") || "next";
-  const status: ItemStatus = isItemStatus(statusRaw) ? statusRaw : "next";
+  const status = normalizeStatus(readString(formData, "status") || "next") ?? "next";
   await withOwner(() =>
     publishItem({
       title: readString(formData, "title"),
@@ -43,7 +41,7 @@ export async function updateItemAction(formData: FormData): Promise<void> {
       id: readString(formData, "id"),
       title: readString(formData, "title") || undefined,
       notes: formData.has("notes") ? readString(formData, "notes") : undefined,
-      status: isItemStatus(statusRaw) ? statusRaw : undefined,
+      status: normalizeStatus(statusRaw),
       forDate: formData.has("forDate")
         ? readString(formData, "forDate") || null
         : undefined,

@@ -1,5 +1,4 @@
 import { JournalBoard } from "@/components/JournalBoard";
-import { listTokens } from "@/lib/agent-tokens";
 import { buildAgenda, listItems } from "@/lib/journal";
 import { storageStatus } from "@/lib/journal-store";
 
@@ -8,12 +7,11 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const storage = storageStatus();
   let items = [] as Awaited<ReturnType<typeof listItems>>;
-  let tokens = [] as Awaited<ReturnType<typeof listTokens>>;
   let loadError: string | undefined;
 
   if (storage.ready) {
     try {
-      [items, tokens] = await Promise.all([listItems(), listTokens()]);
+      items = await listItems();
     } catch (error) {
       loadError =
         error instanceof Error
@@ -27,12 +25,5 @@ export default async function Home() {
     ? { ...storage, ready: false, message: loadError }
     : storage;
 
-  return (
-    <JournalBoard
-      items={items}
-      agenda={agenda}
-      tokens={tokens}
-      storage={status}
-    />
-  );
+  return <JournalBoard items={items} agenda={agenda} storage={status} />;
 }
