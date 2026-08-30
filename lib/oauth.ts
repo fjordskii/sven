@@ -122,8 +122,11 @@ export function isAllowedRedirectUri(uri: string): boolean {
   return parsed.protocol.length > 1 && parsed.protocol !== "javascript:";
 }
 
-export function redirectUrisMatch(allowed: string[], requested: string): boolean {
-  return allowed.includes(requested);
+export function redirectUrisMatch(
+  allowed: string[] | undefined,
+  requested: string,
+): boolean {
+  return Array.isArray(allowed) && allowed.includes(requested);
 }
 
 export async function signAccessToken(claims: {

@@ -25,6 +25,11 @@ export type JournalStore = {
   update(fn: (doc: StoreDoc) => StoreDoc): Promise<StoreDoc>;
 };
 
+export type JsonObjectIo = {
+  read(): Promise<{ text: string; etag?: string } | null>;
+  write(text: string, etag?: string): Promise<void>;
+};
+
 const BLOB_PATH = "sven/journal.json";
 
 let overrideStore: JournalStore | null = null;
@@ -75,8 +80,16 @@ function cloneDoc(doc: StoreDoc): StoreDoc {
   };
 }
 
-function parseDoc(raw: string): StoreDoc {
-  const parsed = JSON.parse(raw) as Partial<StoreDoc>;
+export function parseDoc(raw: string): StoreDoc {
+  let parsed: Partial<StoreDoc>;
+  try {
+    parsed = JSON.parse(raw) as Partial<StoreDoc>;
+  } catch {
+    throw new Error("Journal blob is not valid JSON.");
+  }
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Journal blob is not valid JSON.");
+  }
   return {
     version: 1,
     items: Array.isArray(parsed.items) ? (parsed.items as WorkItem[]) : [],
@@ -92,6 +105,125 @@ function parseDoc(raw: string): StoreDoc {
   };
 }
 
+export function normalizeEtag(etag: string | undefined | null): string | undefined {
+  const trimmed = etag?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export function isMissingBlobError(error: unknown): boolean {
+  if (error == null) return true;
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    name === "BlobNotFoundError" ||
+    /failed to fetch blob:\s*404/i.test(message) ||
+    /requested blob does not exist/i.test(message) ||
+    /blob not found/i.test(message)
+  );
+}
+
+export function isBlobPreconditionError(error: unknown): boolean {
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    name === "BlobPreconditionFailedError" ||
+    /precondition failed/i.test(message) ||
+    /etag mismatch/i.test(message)
+  );
+}
+
+export async function readStreamText(
+  stream: ReadableStream<Uint8Array> | NodeJS.ReadableStream,
+): Promise<string> {
+  const web = stream as ReadableStream<Uint8Array>;
+  if (typeof web.getReader === "function") {
+    const reader = web.getReader();
+    const chunks: Uint8Array[] = [];
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch {
+        /* already released */
+      }
+    }
+    return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream as NodeJS.ReadableStream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+export function createObjectJsonStore(
+  io: JsonObjectIo,
+  kind: StoreKind = "blob",
+): JournalStore {
+  async function loadRaw(): Promise<{
+    doc: StoreDoc;
+    etag?: string;
+    exists: boolean;
+  }> {
+    const result = await io.read();
+    if (!result) {
+      return { doc: emptyDoc(), exists: false };
+    }
+    const etag = normalizeEtag(result.etag);
+    if (!result.text.trim()) {
+      return { doc: emptyDoc(), etag, exists: true };
+    }
+    return { doc: parseDoc(result.text), etag, exists: true };
+  }
+
+  async function persist(doc: StoreDoc, etag?: string): Promise<void> {
+    await io.write(`${JSON.stringify(doc)}\n`, etag);
+  }
+
+  return {
+    kind,
+    async load() {
+      const loaded = await loadRaw();
+      if (!loaded.exists) {
+        try {
+          await persist(loaded.doc);
+        } catch (error) {
+          if (!isBlobPreconditionError(error)) throw error;
+          return cloneDoc((await loadRaw()).doc);
+        }
+      }
+      return cloneDoc(loaded.doc);
+    },
+    async update(fn) {
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const loaded = await loadRaw();
+        const next = fn(cloneDoc(loaded.doc));
+        // Last attempt writes without ifMatch so a download ETag / API ETag
+        // mismatch cannot permanently block DCR or token exchange.
+        const etag = attempt < 3 ? loaded.etag : undefined;
+        try {
+          await persist(next, etag);
+          return cloneDoc(next);
+        } catch (error) {
+          lastError = error;
+          if (isBlobPreconditionError(error)) continue;
+          throw error;
+        }
+      }
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("Journal write conflict. Try again.");
+    },
+  };
+}
+
 function dataDir(): string {
   return process.env.JOURNAL_DATA_DIR?.trim() || path.join(process.cwd(), ".data");
 }
@@ -103,10 +235,17 @@ function createFileStore(): JournalStore {
   async function read(): Promise<StoreDoc> {
     try {
       const raw = await readFile(filePath, "utf8");
+      if (!raw.trim()) {
+        const doc = emptyDoc();
+        await write(doc);
+        return doc;
+      }
       return parseDoc(raw);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return emptyDoc();
+        const doc = emptyDoc();
+        await write(doc);
+        return doc;
       }
       throw error;
     }
@@ -147,78 +286,49 @@ function blobConfigured(): boolean {
 }
 
 async function createBlobStore(): Promise<JournalStore> {
-  const { get, put } = await import("@vercel/blob");
-  const { BlobNotFoundError, BlobPreconditionFailedError } = await import(
-    "@vercel/blob"
-  );
+  const { get, head, put } = await import("@vercel/blob");
 
-  async function read(): Promise<{ doc: StoreDoc; etag?: string }> {
-    const result = await get(BLOB_PATH, {
-      access: "private",
-      useCache: false,
-    });
-    if (!result || result.statusCode !== 200 || !result.stream) {
-      return { doc: emptyDoc() };
-    }
-    const text = await new Response(result.stream).text();
-    return { doc: parseDoc(text), etag: result.blob.etag };
-  }
-
-  async function write(doc: StoreDoc, etag?: string): Promise<void> {
-    await put(BLOB_PATH, `${JSON.stringify(doc)}\n`, {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType: "application/json",
-      cacheControlMaxAge: 60,
-      ...(etag ? { ifMatch: etag } : {}),
-    });
-  }
-
-  return {
-    kind: "blob",
-    async load() {
+  return createObjectJsonStore({
+    async read() {
+      let text: string | null;
       try {
-        const { doc } = await read();
-        return cloneDoc(doc);
+        const result = await get(BLOB_PATH, {
+          access: "private",
+          useCache: false,
+        });
+        if (!result || result.statusCode !== 200 || !result.stream) {
+          text = null;
+        } else {
+          text = await readStreamText(result.stream);
+        }
       } catch (error) {
-        if (error instanceof BlobNotFoundError) return emptyDoc();
+        if (isMissingBlobError(error)) return null;
         throw error;
       }
-    },
-    async update(fn) {
-      let lastError: unknown;
-      for (let attempt = 0; attempt < 4; attempt += 1) {
-        let etag: string | undefined;
-        let current: StoreDoc;
-        try {
-          const loaded = await read();
-          current = loaded.doc;
-          etag = loaded.etag;
-        } catch (error) {
-          if (error instanceof BlobNotFoundError) {
-            current = emptyDoc();
-          } else {
-            throw error;
-          }
-        }
-        const next = fn(cloneDoc(current));
-        try {
-          await write(next, etag);
-          return cloneDoc(next);
-        } catch (error) {
-          lastError = error;
-          if (error instanceof BlobPreconditionFailedError) {
-            continue;
-          }
-          throw error;
+      if (text === null) return null;
+
+      let etag: string | undefined;
+      try {
+        const meta = await head(BLOB_PATH);
+        etag = normalizeEtag(meta.etag);
+      } catch (error) {
+        if (!isMissingBlobError(error)) {
+          etag = undefined;
         }
       }
-      throw lastError instanceof Error
-        ? lastError
-        : new Error("Journal write conflict. Try again.");
+      return { text, etag };
     },
-  };
+    async write(text, etag) {
+      await put(BLOB_PATH, text, {
+        access: "private",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: "application/json",
+        cacheControlMaxAge: 60,
+        ...(etag ? { ifMatch: etag } : {}),
+      });
+    },
+  });
 }
 
 export function storageStatus(): StorageStatus {
@@ -248,7 +358,6 @@ export function getStore(): JournalStore {
     throw new Error(status.message);
   }
   if (status.kind === "blob") {
-    // Lazy: first call creates the blob store. Cache the promise-backed wrapper.
     let inner: Promise<JournalStore> | null = null;
     const store: JournalStore = {
       kind: "blob",
