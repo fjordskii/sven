@@ -25,7 +25,12 @@ export async function decideAuthorization(formData: FormData): Promise<void> {
   const resource = asString(formData.get("resource"));
   const decision = asString(formData.get("decision"));
 
-  const client = await resolveClient(clientId);
+  let client;
+  try {
+    client = await resolveClient(clientId);
+  } catch {
+    throw new Error("Could not load the registered client. Try again.");
+  }
   if (!client || !isAllowedRedirectUri(redirectUri) || !redirectUrisMatch(client.redirect_uris, redirectUri)) {
     throw new Error("This client is not allowed to redirect there.");
   }

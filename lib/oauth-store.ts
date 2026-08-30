@@ -23,7 +23,7 @@ export async function getClient(
   store: JournalStore = getStore(),
 ): Promise<OAuthClient | undefined> {
   const doc = await store.load();
-  return doc.oauthClients.find((client) => client.client_id === clientId);
+  return doc.oauthClients.find((client) => client?.client_id === clientId);
 }
 
 export async function saveAuthCode(

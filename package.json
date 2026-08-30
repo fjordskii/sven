@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/journal.test.ts lib/oauth.test.ts lib/authz.test.ts"
+    "test": "tsx --test lib/journal.test.ts lib/journal-store.test.ts lib/oauth.test.ts lib/oauth-authorize.test.ts lib/authz.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

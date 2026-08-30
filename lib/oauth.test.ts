@@ -4,7 +4,9 @@ import { FORD_ACTOR } from "./actor";
 import {
   hashSecret,
   isAllowedRedirectUri,
+  issuerFromRequest,
   pkceChallengeS256,
+  redirectUrisMatch,
   signAccessToken,
   verifyAccessToken,
   verifyPkce,
@@ -35,6 +37,21 @@ test("redirect URI policy allows localhost and https, not random http", () => {
   assert.equal(isAllowedRedirectUri("cursor://oauth/callback"), true);
   assert.equal(isAllowedRedirectUri("http://evil.example/callback"), false);
   assert.equal(isAllowedRedirectUri("javascript:alert(1)"), false);
+  assert.equal(redirectUrisMatch(undefined, "https://claude.ai/callback"), false);
+});
+
+test("issuer prefers AUTH_URL and strips a trailing slash", () => {
+  const previous = process.env.AUTH_URL;
+  process.env.AUTH_URL = "https://sven-fjordskiis-projects.vercel.app/";
+  try {
+    const issuer = issuerFromRequest(
+      new Request("https://preview.example/oauth/token"),
+    );
+    assert.equal(issuer, "https://sven-fjordskiis-projects.vercel.app");
+  } finally {
+    if (previous === undefined) delete process.env.AUTH_URL;
+    else process.env.AUTH_URL = previous;
+  }
 });
 
 test("access token verifies for the MCP resource and owner", async () => {
