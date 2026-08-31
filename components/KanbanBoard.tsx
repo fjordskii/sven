@@ -16,6 +16,7 @@ const columns: ItemStatus[] = ["in_flight", "next", "done"];
 export function KanbanBoard({ items }: { items: WorkItem[] }) {
   const grouped = groupByStatus(items);
   const [over, setOver] = useState<ItemStatus | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   async function dropOn(status: ItemStatus, event: DragEvent) {
     event.preventDefault();
@@ -58,12 +59,19 @@ export function KanbanBoard({ items }: { items: WorkItem[] }) {
             <h2 id={`col-${status}`} className="sr-only">
               {STATUS_LABEL[status]}
             </h2>
-            <div className="min-h-40 space-y-3">
+            <div className="min-h-40 space-y-1.5">
               {grouped[status].length === 0 ? (
                 <p className="text-sm text-ink-dim">empty</p>
               ) : (
                 grouped[status].map((item) => (
-                  <KanbanCard key={item.id} item={item} />
+                  <KanbanCard
+                    key={item.id}
+                    item={item}
+                    expanded={openId === item.id}
+                    onToggle={() =>
+                      setOpenId((current) => (current === item.id ? null : item.id))
+                    }
+                  />
                 ))
               )}
             </div>
