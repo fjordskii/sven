@@ -28,6 +28,8 @@ async function ensureSchema(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       resolved_at TIMESTAMPTZ
     )`;
+    await q`ALTER TABLE items ADD COLUMN IF NOT EXISTS steps JSONB NOT NULL DEFAULT '[]'::jsonb`;
+    await q`ALTER TABLE items ADD COLUMN IF NOT EXISTS actions JSONB NOT NULL DEFAULT '[]'::jsonb`;
     await q`CREATE TABLE IF NOT EXISTS notes (
       id SERIAL PRIMARY KEY,
       item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
@@ -60,6 +62,8 @@ function toItem(r: Row, notes: Note[]): Item {
     priority: r.priority as Item["priority"],
     status: r.status as Item["status"],
     link: (r.link as string | null) ?? null,
+    steps: Array.isArray(r.steps) ? (r.steps as string[]) : [],
+    actions: Array.isArray(r.actions) ? (r.actions as Item["actions"]) : [],
     opened_at: iso(r.opened_at),
     updated_at: iso(r.updated_at),
     resolved_at: r.resolved_at ? iso(r.resolved_at) : null,
@@ -126,9 +130,10 @@ export async function createItem(
     if (existing[0]) return { item: (await getItem(Number(existing[0].id)))!, created: false };
   }
   const rows = (await q`
-    INSERT INTO items (key, title, product, ask, why, priority, link, opened_at)
+    INSERT INTO items (key, title, product, ask, why, priority, link, steps, actions, opened_at)
     VALUES (${input.key ?? null}, ${input.title}, ${input.product}, ${input.ask},
             ${input.why}, ${input.priority}, ${input.link ?? null},
+            ${JSON.stringify(input.steps ?? [])}::jsonb, ${JSON.stringify(input.actions ?? [])}::jsonb,
             COALESCE(${input.opened_at ?? null}::timestamptz, now()))
     RETURNING id`) as Row[];
   const id = Number(rows[0].id);
@@ -153,7 +158,8 @@ export async function updateItem(
     UPDATE items SET
       key = ${next.key}, title = ${next.title}, product = ${next.product},
       ask = ${next.ask}, why = ${next.why}, priority = ${next.priority},
-      link = ${next.link}, opened_at = ${next.opened_at}::timestamptz,
+      link = ${next.link}, steps = ${JSON.stringify(next.steps)}::jsonb,
+      actions = ${JSON.stringify(next.actions)}::jsonb, opened_at = ${next.opened_at}::timestamptz,
       status = ${next.status}, resolved_at = ${resolvedAt}::timestamptz,
       updated_at = now()
     WHERE id = ${id}`;

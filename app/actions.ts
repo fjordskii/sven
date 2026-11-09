@@ -83,3 +83,11 @@ export async function reopenById(id: number): Promise<void> {
   await updateItem(id, { status: "needs_you" }, "ford");
   revalidatePath("/");
 }
+
+/** Id-based reply for the detail sheet (the sheet appends the note locally). */
+export async function replyById(id: number, body: string): Promise<void> {
+  await guard();
+  if (!Number.isInteger(id) || id <= 0) throw new Error("bad id");
+  const note = body.trim().slice(0, 2000);
+  if (note) await addNote(id, "ford", note);
+}
