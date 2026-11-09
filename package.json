@@ -7,18 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test lib/journal.test.ts lib/journal-store.test.ts lib/oauth.test.ts lib/oauth-authorize.test.ts lib/authz.test.ts"
+    "test": "tsx --test lib/model.test.ts lib/session.test.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
-    "@vercel/blob": "^2.8.0",
-    "jose": "^6.2.10",
-    "mcp-handler": "^2.1.1",
+    "@neondatabase/serverless": "^1.2.0",
     "next": "16.3.3",
-    "next-auth": "^5.0.0-beta.32",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^4.5.4"
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
