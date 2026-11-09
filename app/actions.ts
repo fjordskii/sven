@@ -68,3 +68,18 @@ export async function reply(form: FormData): Promise<void> {
   if (note) await addNote(idFrom(form), "ford", note);
   revalidatePath("/");
 }
+
+/** Id-based helpers for swipe / optimistic UI. Form-based markDone/reopen stay for the buttons. */
+export async function markDoneById(id: number): Promise<void> {
+  await guard();
+  if (!Number.isInteger(id) || id <= 0) throw new Error("bad id");
+  await updateItem(id, { status: "done" }, "ford");
+  revalidatePath("/");
+}
+
+export async function reopenById(id: number): Promise<void> {
+  await guard();
+  if (!Number.isInteger(id) || id <= 0) throw new Error("bad id");
+  await updateItem(id, { status: "needs_you" }, "ford");
+  revalidatePath("/");
+}

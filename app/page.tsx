@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/actions";
-import { ItemRow } from "@/components/ItemRow";
+import { ItemList } from "@/components/ItemList";
 import { requireOwner } from "@/lib/auth";
 import { listItems } from "@/lib/db";
 
@@ -32,18 +32,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           Done<span className="n">{done.length}</span>
         </Link>
       </nav>
-      {items.length === 0 ? (
-        <div className="empty">
-          <strong>{view === "done" ? "Nothing done yet" : "Nothing needs you"}</strong>
-          {view === "done" ? "Closed items show up here." : "You're clear. Agents add items here when they're blocked on you."}
-        </div>
-      ) : (
-        <ul className="list">
-          {items.map((item) => (
-            <ItemRow key={item.id} item={item} />
-          ))}
-        </ul>
-      )}
+      <ItemList
+        key={view}
+        view={view}
+        initialItems={items}
+        openCount={open.length}
+        doneCount={done.length}
+      />
     </main>
   );
 }
