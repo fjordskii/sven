@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { markDoneById, reopenById } from "@/app/actions";
+import { DetailSheet } from "@/components/DetailSheet";
 import { ItemRow } from "@/components/ItemRow";
 import { SwipeableRow } from "@/components/SwipeableRow";
-import type { Item } from "@/lib/model";
+import type { Item, Note } from "@/lib/model";
 
 type View = "needs_you" | "done";
 
@@ -29,6 +30,7 @@ export function ItemList({ view, initialItems, openCount, doneCount }: Props) {
   const [openN, setOpenN] = useState(openCount);
   const [doneN, setDoneN] = useState(doneCount);
   const [undo, setUndo] = useState<PendingUndo | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
   const [, startTransition] = useTransition();
   const undoRef = useRef<PendingUndo | null>(null);
 
@@ -117,6 +119,40 @@ export function ItemList({ view, initialItems, openCount, doneCount }: Props) {
     });
   }, [view]);
 
+  const openItem = useCallback((item: Item) => {
+    setOpenId(item.id);
+    window.history.replaceState(null, "", `#item-${item.id}`);
+  }, []);
+
+  const closeSheet = useCallback(() => {
+    setOpenId(null);
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, []);
+
+  // Deep link: /#item-3 opens that item's detail on load.
+  useEffect(() => {
+    const m = /^#item-(\d+)$/.exec(window.location.hash);
+    if (!m) return;
+    const t = window.setTimeout(() => setOpenId(Number(m[1])), 0);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const addNote = useCallback((itemId: number, note: Note) => {
+    setItems((prev) =>
+      prev.map((i) => (i.id === itemId ? { ...i, notes: [...i.notes, note] } : i)),
+    );
+  }, []);
+
+  const onToggleFromSheet = useCallback(
+    (item: Item) => {
+      closeSheet();
+      applySwipe(item);
+    },
+    [closeSheet, applySwipe],
+  );
+
+  const sheetItem = openId === null ? null : (items.find((i) => i.id === openId) ?? null);
+
   return (
     <>
       <HeaderCounts openN={openN} doneN={doneN} />
@@ -135,12 +171,21 @@ export function ItemList({ view, initialItems, openCount, doneCount }: Props) {
                 actionLabel={view === "needs_you" ? "Done" : "Reopen"}
                 onSwipe={() => applySwipe(item)}
               >
-                <ItemRow item={item} />
+                <ItemRow item={item} onOpen={openItem} />
               </SwipeableRow>
             </li>
           ))}
         </ul>
       )}
+      {sheetItem ? (
+        <DetailSheet
+          key={sheetItem.id}
+          item={sheetItem}
+          onClose={closeSheet}
+          onToggle={onToggleFromSheet}
+          onNote={addNote}
+        />
+      ) : null}
       {undo ? (
         <div className="toast" role="status" aria-live="polite">
           <span>{undo.from === "needs_you" ? "Marked done" : "Reopened"}</span>

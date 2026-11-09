@@ -4,7 +4,7 @@ import { ValidationError, parseCreate, parseUpdate, sortItems, type Item } from 
 
 const base: Item = {
   id: 1, key: null, title: "t", product: "Other", ask: "a", why: "", priority: "normal",
-  status: "needs_you", link: null, opened_at: "2026-11-01T00:00:00.000Z",
+  status: "needs_you", link: null, steps: [], actions: [], opened_at: "2026-11-01T00:00:00.000Z",
   updated_at: "2026-11-01T00:00:00.000Z", resolved_at: null, notes: [],
 };
 
@@ -33,4 +33,26 @@ test("parseUpdate resolve shortcut and empty body", () => {
   assert.deepEqual(parseUpdate({ resolve: true }), { status: "done" });
   assert.deepEqual(parseUpdate({ link: null }), { link: null });
   assert.throws(() => parseUpdate({}), ValidationError);
+});
+
+test("steps and actions parse, trim and validate", () => {
+  const c = parseCreate({
+    title: "t", ask: "a",
+    steps: [" **Open** it ", "", "Do it"],
+    actions: [{ label: " Open Admin ", url: "https://admin.shopify.com/store/x" }],
+  });
+  assert.deepEqual(c.steps, ["**Open** it", "Do it"]);
+  assert.deepEqual(c.actions, [{ label: "Open Admin", url: "https://admin.shopify.com/store/x" }]);
+  assert.deepEqual(parseCreate({ title: "t", ask: "a", steps: "1. One\n2) Two\n- Three" }).steps, ["One", "Two", "Three"]);
+  assert.deepEqual(parseCreate({ title: "t", ask: "a" }).steps, []);
+  assert.throws(() => parseCreate({ title: "t", ask: "a", steps: [1] }), ValidationError);
+  assert.throws(() => parseCreate({ title: "t", ask: "a", actions: [{ label: "x", url: "javascript:1" }] }), ValidationError);
+  assert.throws(() => parseCreate({ title: "t", ask: "a", actions: [{ label: "", url: "https://a.b" }] }), ValidationError);
+  assert.throws(() => parseCreate({ title: "t", ask: "a", actions: "nope" }), ValidationError);
+});
+
+test("parseUpdate accepts steps/actions and clearing", () => {
+  assert.deepEqual(parseUpdate({ steps: ["a"] }), { steps: ["a"] });
+  assert.deepEqual(parseUpdate({ actions: [] }), { actions: [] });
+  assert.deepEqual(parseUpdate({ steps: null }), { steps: [] });
 });

@@ -25,7 +25,7 @@ type Props = {
  * Horizontal swipe on a list row. Only engages when movement is horizontally
  * dominant so vertical scroll still works. Either direction past ~35% width
  * commits; under that, snaps back. Suppresses the next click so a swipe
- * doesn't toggle <details>.
+ * doesn't open the detail sheet.
  */
 export function SwipeableRow({ children, actionLabel, onSwipe, disabled }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -91,11 +91,6 @@ export function SwipeableRow({ children, actionLabel, onSwipe, disabled }: Props
     width.current = trackRef.current?.offsetWidth ?? 1;
     setWidthPx(width.current);
     setAnimating(false);
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
-    }
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -111,6 +106,12 @@ export function SwipeableRow({ children, actionLabel, onSwipe, disabled }: Props
       }
       engaged.current = true;
       suppressClick.current = true;
+      // Capture only once the gesture is a horizontal drag, so plain taps keep their own target.
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
     }
     e.preventDefault();
     const max = width.current;
